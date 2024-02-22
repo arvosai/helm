@@ -11,37 +11,61 @@ commonLabels: {}
 # -- Common environment variables that will be applied to all deployments/statefulsets created by the chart. Be careful not to override values already specified by the chart.
 commonEnv: []
 
-images:
-   # -- Secrets with credentials to pull images from a private registry. Specified as name: value.
-  imagePullSecrets: []
-  backendImage:
-    repository: "docker.io/langchain/langsmith-backend"
-    pullPolicy: IfNotPresent
-    tag: "0.7.32"
-  frontendImage:
-    repository: "docker.io/langchain/langsmith-frontend"
-    pullPolicy: IfNotPresent
-    tag: "0.7.32"
-  platformBackendImage:
-    repository: "docker.io/langchain/langsmith-go-backend"
-    pullPolicy: IfNotPresent
-    tag: "0.7.32"
-  playgroundImage:
-    repository: "docker.io/langchain/langsmith-playground"
-    pullPolicy: IfNotPresent
-    tag: "0.7.32"
-  postgresImage:
-    repository: "docker.io/postgres"
-    pullPolicy: IfNotPresent
-    tag: "14.7"
-  redisImage:
-    repository: "docker.io/redis"
-    pullPolicy: IfNotPresent
-    tag: "7"
-  clickhouseImage:
-    repository: "docker.io/clickhouse/clickhouse-server"
-    pullPolicy: Always
-    tag: "24.2"
+
+global:
+  azure:
+    webhookUri: "https://langsmith-billing-admin.azurewebsites.net/api/container?sig=MTA3ZGY1ODEtMmY4OC00MjRhLWJjNzctNzZiMGExYWZmNzY3"
+    productID: "langsmith"
+    identity:
+      # Application's Managed Service Identity (MSI) Client ID. ClientID can be used to generate authentication token to communicate to external services like Microsoft Marketplace Metering API
+      clientId: "DONOTMODIFY" # Azure populates this value at deployment time
+    marketplace:
+      # id of the plan purchased for the Azure Marketplace Kubernetes application,to be used in usage event payload to metering api, for more information please refer: https://learn.microsoft.com/en-us/partner-center/marketplace/marketplace-metering-service-apis
+      planId: "DONOTMODIFY" # Azure populates this value at deployment time
+    extension:
+      # resource id of the Azure Marketplace Kubernetes application,to be used in usage event payload to metering api, for more information please refer: https://learn.microsoft.com/en-us/partner-center/marketplace/marketplace-metering-service-apis
+      resourceId: "DONOTMODIFY" # application's Azure Resource ID, Azure populates this value at deployment time
+    images:
+      backendImage:
+        tag: "0.7.32"
+        image: "langsmith-backend"
+        registry: "langsmith.azurecr.io"
+        pullPolicy: IfNotPresent
+      frontendImage:
+        tag: "0.7.32"
+        image: "langsmith-frontend"
+        registry: "langsmith.azurecr.io"
+        pullPolicy: IfNotPresent
+      platformBackendImage:
+        tag: "0.7.32"
+        image: "langsmith-go-backend"
+        registry: "langsmith.azurecr.io"
+        pullPolicy: IfNotPresent
+      playgroundImage:
+        tag: "0.7.32"
+        image: "langsmith-playground"
+        registry: "langsmith.azurecr.io"
+        pullPolicy: IfNotPresent
+      postgresImage:
+        tag: "14.7"
+        image: "postgres"
+        registry: "langsmith.azurecr.io"
+        pullPolicy: IfNotPresent
+      redisImage:
+        tag: "7"
+        image: "redis"
+        registry: "langsmith.azurecr.io"
+        pullPolicy: IfNotPresent
+      clickhouseImage:
+        tag: "24.2"
+        image: "clickhouse-server"
+        registry: "langsmith.azurecr.io"
+        pullPolicy: IfNotPresent
+      customMetersAcceleratorImage:
+        tag: "92049a3"
+        image: "custom-meters-accelerator"
+        registry: "langsmith.azurecr.io"
+        pullPolicy: IfNotPresents
 
 ingress:
   enabled: false
@@ -66,7 +90,6 @@ apiIngress:
 config:
   existingSecretName: ""
   langsmithLicenseKey: ""
-  # -- Salt used to generate the API key. Should be a random string.
   apiKeySalt: ""
   logLevel: "info"
   authType: ""
@@ -112,7 +135,6 @@ config:
 backend:
   name: "backend"
   containerPort: 1984
-  existingConfigMapName: ""
   deployment:
     autoRestart: true
     replicas: 1
@@ -120,13 +142,6 @@ backend:
     annotations: {}
     podSecurityContext: {}
     securityContext: {}
-    resources:
-      limits:
-        cpu: 2000m
-        memory: 4Gi
-      requests:
-        cpu: 1000m
-        memory: 2Gi
     command:
       - "uvicorn"
       - "app.main:app"
@@ -162,6 +177,10 @@ backend:
       failureThreshold: 6
       periodSeconds: 10
       timeoutSeconds: 1
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
     extraContainerConfig: {}
     extraEnv: []
     sidecars: []
@@ -247,12 +266,12 @@ backend:
     volumes: []
     volumeMounts: []
   autoscaling:
-    enabled: false
+    enabled: true
     # If enabled, use the following values to configure the HPA. You can also use your own HPA configuration by not creating an HPA.
     # You may want to manage the HPA yourself if you have a custom autoscaling setup like KEDA.
     createHpa: true
     minReplicas: 1
-    maxReplicas: 5
+    maxReplicas: 10
     targetCPUUtilizationPercentage: 50
     targetMemoryUtilizationPercentage: 80
   service:
@@ -303,8 +322,8 @@ clickhouse:
         cpu: 8000m
         memory: 32Gi
       requests:
-        cpu: 3500m
-        memory: 12Gi
+        cpu: 1500m
+        memory: 3500Mi
     command:
       - "/bin/bash"
       - "-c"
@@ -341,7 +360,7 @@ clickhouse:
     volumeMounts: []
     # We recommend using a persistent volume and increasing the storage size to something like 50Gi when using in a production environment!
     persistence:
-      size: 50Gi
+      size: 8Gi
       storageClassName: ""
   service:
     type: ClusterIP
@@ -373,13 +392,6 @@ frontend:
     annotations: {}
     podSecurityContext: {}
     securityContext: {}
-    resources:
-      limits:
-        cpu: 1000m
-        memory: 2Gi
-      requests:
-        cpu: 500m
-        memory: 1Gi
     command:
       - "/entrypoint.sh"
     startupProbe:
@@ -403,6 +415,10 @@ frontend:
       failureThreshold: 10
       periodSeconds: 10
       timeoutSeconds: 1
+    resources:
+      requests:
+        cpu: 200m
+        memory: 500Mi
     extraContainerConfig: {}
     extraEnv: []
     sidecars: []
@@ -413,7 +429,7 @@ frontend:
     volumes: []
     volumeMounts: []
   autoscaling:
-    enabled: false
+    enabled: true
     # If enabled, use the following values to configure the HPA. You can also use your own HPA configuration by not creating an HPA.
     # You may want to manage the HPA yourself if you have a custom autoscaling setup like KEDA.
     createHpa: true
@@ -422,7 +438,7 @@ frontend:
     targetCPUUtilizationPercentage: 50
     targetMemoryUtilizationPercentage: 80
   service:
-    type: LoadBalancer
+    type: ClusterIP
     httpPort: 80
     httpsPort: 443
     labels: {}
@@ -517,13 +533,6 @@ playground:
     annotations: {}
     podSecurityContext: {}
     securityContext: {}
-    resources:
-      limits:
-        cpu: 1000m
-        memory: 2Gi
-      requests:
-        cpu: 500m
-        memory: 1Gi
     command:
       - "yarn"
       - "start"
@@ -548,6 +557,10 @@ playground:
       failureThreshold: 6
       periodSeconds: 10
       timeoutSeconds: 1
+    resources:
+      requests:
+        cpu: 200m
+        memory: 500Mi
     extraContainerConfig: {}
     extraEnv: []
     sidecars: []
@@ -558,13 +571,11 @@ playground:
     volumes: []
     volumeMounts: []
   autoscaling:
-    enabled: false
-    # If enabled, use the following values to configure the HPA. You can also use your own HPA configuration by not creating an HPA.
-    # You may want to manage the HPA yourself if you have a custom autoscaling setup like KEDA.
+    enabled: true
     createHpa: true
     minReplicas: 1
-    maxReplicas: 5
-    targetCPUUtilizationPercentage: 50
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 80
     targetMemoryUtilizationPercentage: 80
   service:
     type: ClusterIP
@@ -602,13 +613,9 @@ postgres:
     podSecurityContext: {}
     securityContext: {}
     resources:
-      # In a production environment, we strongly recommend an external Postgres database.
-      limits:
-        cpu: 4000m
-        memory: 16Gi
       requests:
-        cpu: 2000m
-        memory: 8Gi
+        cpu: 1000m
+        memory: 2Gi
     command: []
     startupProbe:
       exec:
@@ -672,12 +679,9 @@ queue:
     podSecurityContext: {}
     securityContext: {}
     resources:
-      limits:
-        cpu: 2000m
-        memory: 4Gi
       requests:
         cpu: 1000m
-        memory: 2Gi
+        memory: 2000Mi
     command:
       - "saq"
       - "app.workers.queues.single_queue_worker.settings"
@@ -719,7 +723,7 @@ queue:
     volumes: []
     volumeMounts: []
   autoscaling:
-    enabled: false
+    enabled: true
     # If enabled, use the following values to configure the HPA. You can also use your own HPA configuration by not creating an HPA.
     # You may want to manage the HPA yourself if you have a custom autoscaling setup like KEDA.
     createHpa: true
@@ -747,14 +751,10 @@ redis:
     annotations: {}
     podSecurityContext: {}
     securityContext: {}
-    # In a production environment, we strongly recommend an external Redis database.
     resources:
-      limits:
-        cpu: 4000m
-        memory: 8Gi
       requests:
-        cpu: 2000m
-        memory: 4Gi
+        cpu: 1000m
+        memory: 2Gi
     command: []
     startupProbe:
       exec:
