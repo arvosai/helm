@@ -225,6 +225,10 @@ Template containing common environment variables that are used by several servic
 {{- end }}
 - name: GO_ENDPOINT
   value: http://{{- include "langsmith.fullname" . }}-{{.Values.platformBackend.name}}:{{ .Values.platformBackend.service.port }}
+- name: GO_ACE_ENDPOINT
+  value: http://{{- include "langsmith.fullname" . }}-{{.Values.aceBackend.name}}:{{ .Values.aceBackend.service.port }}
+- name: PLAYGROUND_ENDPOINT
+  value: http://{{- include "langsmith.fullname" . }}-{{.Values.playground.name}}:{{ .Values.playground.service.port }}
 - name: SMITH_BACKEND_ENDPOINT
   value: http://{{- include "langsmith.fullname" . }}-{{.Values.backend.name}}:{{ .Values.backend.service.port }}
 - name: X_SERVICE_AUTH_JWT_SECRET
@@ -269,6 +273,15 @@ Template containing common environment variables that are used by several servic
 - name: FF_CH_SEARCH_ENABLED
   value: {{ .Values.config.blobStorage.chSearchEnabled | quote }}
 {{- end }}
+
+{{- define "aceBackend.serviceAccountName" -}}
+{{- if .Values.aceBackend.serviceAccount.create -}}
+    {{ default (printf "%s-%s" (include "langsmith.fullname" .) .Values.aceBackend.name) .Values.aceBackend.serviceAccount.name | trunc 63 | trimSuffix "-" }}
+{{- else -}}
+    {{ default "default" .Values.aceBackend.serviceAccount.name }}
+{{- end -}}
+{{- end -}}
+
 
 {{- define "backend.serviceAccountName" -}}
 {{- if .Values.backend.serviceAccount.create -}}

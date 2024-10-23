@@ -49,15 +49,19 @@ spec:
           command:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-          {{- if or .Values.playground.deployment.extraEnv .Values.commonEnv  }}
           env:
+            - name: "LANGCHAIN_ENV"
+              value: "local_kubernetes"
+            - name: "LOG_LEVEL"
+              value: {{ .Values.config.logLevel | quote }}
+            - name: "PORT"
+              value: {{ .Values.playground.containerPort | quote }}
             {{- with .Values.playground.deployment.extraEnv}}
              {{- toYaml . | nindent 12 }}
             {{- end }}
             {{- with .Values.commonEnv}}
              {{- toYaml . | nindent 12 }}
             {{- end }}
-           {{- end }}
           image: "{{ .Values.images.playgroundImage.repository }}:{{ .Values.images.playgroundImage.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.images.playgroundImage.pullPolicy }}
           ports:
